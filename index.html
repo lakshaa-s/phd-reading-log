@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PhD Reading Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+/* A ledger: progress strip, filters, then one row per paper that opens to show why it matters and notes.
+   Data comes from papers.csv in this repo. */
+:root {
+  --bg: #f5f7f7; --panel: #ffffff; --fg: #15201f; --muted: #5b6a68; --line: #dbe2e1;
+  --accent: #0f6b63; --accent-soft: #dcefec;
+  --s-toread: #6b7775; --s-toread-bg: #eceff0;
+  --s-reading: #8a5a00; --s-reading-bg: #fbefd6;
+  --s-read: #0f6b63; --s-read-bg: #dcefec;
+  --s-key: #5b3fa3; --s-key-bg: #ebe5f8;
+  --display: "IBM Plex Serif", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0f1514; --panel: #161e1d; --fg: #e4ecea; --muted: #94a5a2; --line: #283433;
+  --accent: #5fc4b8; --accent-soft: #173431;
+  --s-toread: #a4b2b0; --s-toread-bg: #222c2b;
+  --s-reading: #f0bf62; --s-reading-bg: #3a2c10;
+  --s-read: #5fc4b8; --s-read-bg: #173431;
+  --s-key: #b8a2f0; --s-key-bg: #2a2340;
+  color-scheme: dark } }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 20px; }
+h1 { font: 600 30px/1.15 var(--display); margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 64ch; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.stat .n { font: 500 22px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.stat .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; display: flex; margin-top: 8px; }
+.bar span { display: block; height: 100%; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters input[type=search] { flex: 1 1 220px; min-width: 0; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 10px; }
+.filters select { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; }
+details.paper { border-top: 1px solid var(--line); }
+details.paper:first-child { border-top: 0; }
+summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; }
+summary::-webkit-details-marker { display: none; }
+summary:hover { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.title { font-weight: 600; line-height: 1.35; text-wrap: pretty; }
+.meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.arms { display: flex; gap: 4px; flex-wrap: wrap; justify-content: end; }
+.arm { font: 500 11px/1 var(--mono); letter-spacing: .04em; border: 1px solid var(--line); border-radius: 4px; padding: 4px 5px; color: var(--muted); white-space: nowrap; }
+.status { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.st-toread { color: var(--s-toread); background: var(--s-toread-bg); }
+.st-reading { color: var(--s-reading); background: var(--s-reading-bg); }
+.st-read { color: var(--s-read); background: var(--s-read-bg); }
+.st-key { color: var(--s-key); background: var(--s-key-bg); }
+.pri { font: 500 11px var(--mono); color: var(--muted); display: block; margin-top: 6px; }
+.body { padding: 4px 14px 16px 118px; display: flex; flex-direction: column; gap: 12px; }
+.body p { margin: 0; max-width: 72ch; white-space: pre-wrap; }
+.lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 3px; }
+.body a, footer a { color: var(--accent); word-break: break-all; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 720px) {
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary .stat:first-child { grid-column: 1 / -1; }
+  summary { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .arms { justify-content: start; }
+  .body { padding: 4px 14px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PhD Reading Log</h1>
+    <p class="sub">Papers I’ve read and plan to read for my PhD on morphological neural networks, tagged by plan arm. Open a paper to see why it matters and my notes.</p>
+  </header>
+  <section class="summary" id="summary" aria-label="Reading progress"></section>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Search title, authors, notes" aria-label="Search papers">
+    <div class="chips" id="statusChips" role="group" aria-label="Filter by status"></div>
+    <select id="armFilter" aria-label="Filter by plan arm"></select>
+    <select id="yearFilter" aria-label="Filter by year added"></select>
+    <select id="sort" aria-label="Sort">
+      <option value="priority">Sort: priority</option>
+      <option value="year">Sort: newest paper</option>
+      <option value="added">Sort: recently added</option>
+      <option value="title">Sort: title</option>
+    </select>
+  </div>
+  <div class="list" id="list"><div class="empty">Loading papers…</div></div>
+  <footer>
+    <span id="arms-key"></span>
+    <span id="updated"></span>
+  </footer>
+</div>
+<script>
+const STATUSES = [
+  { id: 'To read', cls: 'st-toread', color: 'var(--s-toread)' },
+  { id: 'Reading', cls: 'st-reading', color: 'var(--s-reading)' },
+  { id: 'Read', cls: 'st-read', color: 'var(--s-read)' },
+  { id: 'Key paper', cls: 'st-key', color: 'var(--s-key)' },
+];
+const ARM_LABELS = { A1: 'build with motifs (evolution)', A2: 'build with morphological neurons (gradients)', B1: 'E:I balance', B2: 'multisensory integration', C1: 'perturbing morphology', C2: 'disease-model sets', Methods: 'methods', Background: 'background' };
+const PRI = { High: 1, Medium: 2, Low: 3 };
+const state = { papers: [], status: 'all', arm: 'all', yearAdded: 'all', q: '', sort: 'priority' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function parseCSV(text) {
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  const [head, ...rest] = rows.filter(r => r.some(x => x.trim()));
+  return rest.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? '').trim()])));
+}
+
+const stOf = s => STATUSES.find(x => x.id === s) || STATUSES[0];
+const arms = p => p.arms ? p.arms.split(/[;,]/).map(a => a.trim()).filter(Boolean) : [];
+
+function render() {
+  const n = state.papers.length;
+  const counts = Object.fromEntries(STATUSES.map(s => [s.id, state.papers.filter(p => stOf(p.status).id === s.id).length]));
+  const done = counts['Read'] + counts['Key paper'];
+  const bar = n ? STATUSES.map(s => `<span style="width:${100 * counts[s.id] / n}%;background:${s.color}" title="${s.id}: ${counts[s.id]}"></span>`).join('') : '';
+  $('summary').innerHTML = `<div class="stat"><div class="n">${done}/${n}</div><div class="l">Done (read or key)</div><div class="bar">${bar}</div></div>` +
+    STATUSES.map(s => `<div class="stat"><div class="n">${counts[s.id]}</div><div class="l">${s.id}</div></div>`).join('');
+  $('statusChips').innerHTML = [{ id: 'all', label: 'All' }, ...STATUSES].map(s =>
+    `<button type="button" class="chip" data-status="${esc(s.id)}" aria-pressed="${state.status === s.id}">${esc(s.label || s.id)}</button>`).join('');
+  const q = state.q.trim().toLowerCase();
+  const ps = state.papers.filter(p =>
+    (state.status === 'all' || stOf(p.status).id === state.status) &&
+    (state.arm === 'all' || arms(p).includes(state.arm)) &&
+    (state.yearAdded === 'all' || (p.added || '').startsWith(state.yearAdded)) &&
+    (!q || [p.title, p.authors, p.venue, p.why, p.notes].join(' ').toLowerCase().includes(q)));
+  const by = {
+    priority: (a, b) => (PRI[a.priority] || 2) - (PRI[b.priority] || 2) || (+b.year || 0) - (+a.year || 0),
+    year: (a, b) => (+b.year || 0) - (+a.year || 0),
+    added: (a, b) => String(b.added).localeCompare(String(a.added)),
+    title: (a, b) => String(a.title).localeCompare(String(b.title)),
+  }[state.sort];
+  ps.sort(by);
+  $('list').innerHTML = !n ? `<div class="empty">No papers yet. Add rows to papers.csv.</div>`
+    : !ps.length ? `<div class="empty">No papers match these filters.</div>`
+    : ps.map(p => {
+      const s = stOf(p.status);
+      const meta = [p.authors, p.year, p.venue].filter(Boolean).map(esc).join(' · ');
+      return `<details class="paper">
+        <summary>
+          <div><span class="status ${s.cls}">${esc(s.id)}</span><span class="pri">${esc(p.priority || 'Medium')} priority</span></div>
+          <div><div class="title">${esc(p.title)}</div><div class="meta">${meta}</div></div>
+          <div class="arms">${arms(p).map(a => `<span class="arm" title="${esc(ARM_LABELS[a] || a)}">${esc(a)}</span>`).join('')}</div>
+        </summary>
+        <div class="body">
+          ${p.why ? `<div><div class="lbl">Why it matters</div><p>${esc(p.why)}</p></div>` : ''}
+          ${p.notes ? `<div><div class="lbl">Notes</div><p>${esc(p.notes)}</p></div>` : ''}
+          ${p.link ? `<div><div class="lbl">Link</div><a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.link)}</a></div>` : ''}
+          ${p.added ? `<div class="meta">Added ${esc(p.added.slice(0, 10))}</div>` : ''}
+        </div>
+      </details>`;
+    }).join('');
+}
+
+$('statusChips').addEventListener('click', e => { const b = e.target.closest('[data-status]'); if (b) { state.status = b.dataset.status; render(); } });
+$('armFilter').addEventListener('change', e => { state.arm = e.target.value; render(); });
+$('yearFilter').addEventListener('change', e => { state.yearAdded = e.target.value; render(); });
+$('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+$('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+
+fetch('papers.csv', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
+  state.papers = parseCSV(t);
+  const used = [...new Set(state.papers.flatMap(arms))];
+  const order = Object.keys(ARM_LABELS);
+  used.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  $('armFilter').innerHTML = `<option value="all">All arms</option>` + used.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  const years = [...new Set(state.papers.map(p => (p.added || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  $('yearFilter').innerHTML = `<option value="all">Added: any year</option>` + years.map(y => `<option value="${y}">Added in ${y}</option>`).join('');
+  $('arms-key').textContent = 'Arms: ' + used.map(a => `${a} ${ARM_LABELS[a] || ''}`.trim()).join(' · ');
+  const latest = state.papers.map(p => p.added).filter(Boolean).sort().pop();
+  if (latest) $('updated').textContent = `${state.papers.length} papers · last added ${latest.slice(0, 10)}`;
+  render();
+}).catch(() => { $('list').innerHTML = `<div class="empty">Could not load papers.csv. If you opened this file directly, run a local server instead (see the README).</div>`; });
+</script>
+</body>
+</html>
