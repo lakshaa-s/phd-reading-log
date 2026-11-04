@@ -2,7 +2,11 @@
 
 Papers I've read and plan to read during my PhD on morphological neural networks (Imperial, with Marcus Ghosh), tagged by plan arm. The site is generated from `papers.csv` and published with GitHub Pages.
 
-## Adding and updating papers
+## Editing on the site
+
+Click **Edit** on the site and paste a fine-grained personal access token (GitHub → Settings → Developer settings → Fine-grained tokens) with access to this repository only and **Contents: Read and write** permission. The token stays in that browser. Then you can add papers (with DOI or arXiv look-up), change status, priority and arms, write notes and remove papers; each save is a commit to `papers.csv`, and the public site updates a minute or two later. **Stop editing** removes the token from the browser.
+
+## Adding and updating papers from the terminal
 
 From the repo folder:
 

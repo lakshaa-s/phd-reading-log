@@ -9,10 +9,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
 <style>
 /* A ledger: progress strip, filters, then one row per paper that opens to show why it matters and notes.
-   Data comes from papers.csv in this repo. */
+   Data comes from papers.csv in this repo; in edit mode the page saves changes back to it through the GitHub API. */
 :root {
   --bg: #f5f7f7; --panel: #ffffff; --fg: #15201f; --muted: #5b6a68; --line: #dbe2e1;
-  --accent: #0f6b63; --accent-soft: #dcefec;
+  --accent: #0f6b63; --accent-soft: #dcefec; --danger: #a3302a;
   --s-toread: #6b7775; --s-toread-bg: #eceff0;
   --s-reading: #8a5a00; --s-reading-bg: #fbefd6;
   --s-read: #0f6b63; --s-read-bg: #dcefec;
@@ -24,7 +24,7 @@
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #0f1514; --panel: #161e1d; --fg: #e4ecea; --muted: #94a5a2; --line: #283433;
-  --accent: #5fc4b8; --accent-soft: #173431;
+  --accent: #5fc4b8; --accent-soft: #173431; --danger: #f08a82;
   --s-toread: #a4b2b0; --s-toread-bg: #222c2b;
   --s-reading: #f0bf62; --s-reading-bg: #3a2c10;
   --s-read: #5fc4b8; --s-read-bg: #173431;
@@ -36,10 +36,19 @@ body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
 .wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 64px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; }
 h1 { font: 600 30px/1.15 var(--display); margin: 0; text-wrap: balance; }
 .sub { color: var(--muted); margin: 4px 0 0; max-width: 64ch; }
-button, input, select { font: inherit; color: inherit; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 500; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .6; cursor: default; }
+.banner { background: var(--accent-soft); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.banner.err { color: var(--danger); }
 .summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .stat .n { font: 500 22px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
@@ -70,25 +79,50 @@ summary:hover { background: color-mix(in srgb, var(--accent-soft) 45%, transpare
 .pri { font: 500 11px var(--mono); color: var(--muted); display: block; margin-top: 6px; }
 .body { padding: 4px 14px 16px 118px; display: flex; flex-direction: column; gap: 12px; }
 .body p { margin: 0; max-width: 72ch; white-space: pre-wrap; }
-.lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 3px; }
-.body a, footer a { color: var(--accent); word-break: break-all; }
+.lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 3px; display: block; }
+.body a, footer a, .hint a { color: var(--accent); word-break: break-all; }
+.edit { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.edit-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.edit select, .edit input, .edit textarea, form.add input, form.add select, form.add textarea, form.tok input {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 6px 9px; font-size: 14px; }
+.edit textarea, form.add textarea { width: 100%; min-height: 84px; resize: vertical; }
+.saved { color: var(--muted); font-size: 12px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); }
 footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--fg); padding: 0; width: min(620px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .35); }
+form.add, form.tok { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; padding: 18px; }
+form h2 { grid-column: 1 / -1; margin: 0 0 4px; font: 600 20px var(--display); }
+form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+form .full { grid-column: 1 / -1; }
+.lookup { display: flex; gap: 8px; }
+.lookup input { flex: 1; min-width: 0; }
+.hint { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin: 0; }
+.actions { grid-column: 1 / -1; display: flex; justify-content: end; gap: 8px; margin-top: 6px; }
+.err { grid-column: 1 / -1; color: var(--danger); font-size: 13px; margin: 0; }
 @media (max-width: 720px) {
   .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary .stat:first-child { grid-column: 1 / -1; }
   summary { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .arms { justify-content: start; }
   .body { padding: 4px 14px 16px; }
+  form.add, form.tok { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>PhD Reading Log</h1>
-    <p class="sub">Papers I’ve read and plan to read for my PhD on morphological neural networks, tagged by plan arm. Open a paper to see why it matters and my notes.</p>
+    <div>
+      <h1>PhD Reading Log</h1>
+      <p class="sub">Papers I’ve read and plan to read for my PhD on morphological neural networks, tagged by plan arm. Open a paper to see why it matters and my notes.</p>
+    </div>
+    <div class="tools">
+      <button class="btn primary" id="addBtn" type="button" hidden>Add paper</button>
+      <button class="btn" id="editBtn" type="button">Edit</button>
+    </div>
   </header>
+  <div class="banner" id="banner" hidden></div>
   <section class="summary" id="summary" aria-label="Reading progress"></section>
   <div class="filters">
     <input type="search" id="q" placeholder="Search title, authors, notes" aria-label="Search papers">
@@ -108,7 +142,39 @@ footer { color: var(--muted); font-size: 13px; display: flex; flex-direction: co
     <span id="updated"></span>
   </footer>
 </div>
+
+<dialog id="tokDlg">
+  <form class="tok" id="tokForm">
+    <h2>Edit the reading log</h2>
+    <p class="hint">Changes are saved to <span id="repoName"></span> on GitHub. Paste a fine-grained personal access token for that repository with <b>Contents: Read and write</b> permission. It is kept only in this browser. <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a></p>
+    <label class="full">Token<input id="tokInput" type="password" autocomplete="off" required></label>
+    <p class="err" id="tokErr" hidden></p>
+    <div class="actions"><button class="btn" type="button" id="tokCancel">Cancel</button><button class="btn primary" type="submit">Start editing</button></div>
+  </form>
+</dialog>
+
+<dialog id="addDlg">
+  <form class="add" id="addForm">
+    <h2>Add a paper</h2>
+    <label class="full">DOI or arXiv ID (optional)
+      <span class="lookup"><input id="f-ident" placeholder="10.1038/s41593-018-0310-2 or 2207.03523"><button class="btn" type="button" id="f-lookup">Look up</button></span>
+    </label>
+    <label class="full">Title<input id="f-title" required></label>
+    <label class="full">Authors<input id="f-authors" placeholder="Béna & Goodman"></label>
+    <label>Year<input id="f-year" inputmode="numeric"></label>
+    <label>Venue<input id="f-venue"></label>
+    <label class="full">Link<input id="f-link" type="url"></label>
+    <label>Arms<input id="f-arms" placeholder="A1; B2"></label>
+    <label>Status<select id="f-status"></select></label>
+    <label>Priority<select id="f-priority"><option>High</option><option selected>Medium</option><option>Low</option></select></label>
+    <label class="full">Why it matters<textarea id="f-why"></textarea></label>
+    <p class="err" id="f-err" hidden></p>
+    <div class="actions"><button class="btn" type="button" id="f-cancel">Cancel</button><button class="btn primary" type="submit" id="f-save">Save paper</button></div>
+  </form>
+</dialog>
+
 <script>
+const FIELDS = ['id', 'title', 'authors', 'year', 'venue', 'link', 'arms', 'status', 'priority', 'why', 'notes', 'added'];
 const STATUSES = [
   { id: 'To read', cls: 'st-toread', color: 'var(--s-toread)' },
   { id: 'Reading', cls: 'st-reading', color: 'var(--s-reading)' },
@@ -117,10 +183,21 @@ const STATUSES = [
 ];
 const ARM_LABELS = { A1: 'build with motifs (evolution)', A2: 'build with morphological neurons (gradients)', B1: 'E:I balance', B2: 'multisensory integration', C1: 'perturbing morphology', C2: 'disease-model sets', Methods: 'methods', Background: 'background' };
 const PRI = { High: 1, Medium: 2, Low: 3 };
-const state = { papers: [], status: 'all', arm: 'all', yearAdded: 'all', q: '', sort: 'priority' };
+// Repository that holds papers.csv: worked out from the GitHub Pages address, or set it here.
+const REPO = (() => {
+  const h = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const seg = location.pathname.split('/').filter(Boolean)[0];
+  return h && seg ? `${h[1]}/${seg}` : 'lakshaa-s/phd-reading-log';
+})();
+const state = { papers: [], status: 'all', arm: 'all', yearAdded: 'all', q: '', sort: 'priority', open: new Set(), confirm: null, token: null, sha: null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const stOf = s => STATUSES.find(x => x.id === s) || STATUSES[0];
+const arms = p => p.arms ? p.arms.split(/[;,]/).map(a => a.trim()).filter(Boolean) : [];
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 
+// ---------------------------------------------------------------- CSV
 function parseCSV(text) {
   const rows = []; let row = [], field = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -133,14 +210,50 @@ function parseCSV(text) {
   }
   if (field || row.length) { row.push(field); rows.push(row); }
   const [head, ...rest] = rows.filter(r => r.some(x => x.trim()));
+  if (!head) return [];
   return rest.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? '').trim()])));
 }
+const csvField = v => { v = String(v ?? ''); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+const toCSV = rows => [FIELDS.join(','), ...rows.map(r => FIELDS.map(f => csvField(r[f])).join(','))].join('\n') + '\n';
 
-const stOf = s => STATUSES.find(x => x.id === s) || STATUSES[0];
-const arms = p => p.arms ? p.arms.split(/[;,]/).map(a => a.trim()).filter(Boolean) : [];
+// ---------------------------------------------------------------- GitHub
+const b64enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (const x of b) bin += String.fromCharCode(x); return btoa(bin); };
+const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g, '')), c => c.charCodeAt(0)));
+async function gh(path, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, { ...opts,
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${state.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (!r.ok) { const e = new Error(`GitHub ${r.status}`); e.status = r.status; throw e; }
+  return r.json();
+}
+async function pull() {
+  const j = await gh('papers.csv?ref=main');
+  state.sha = j.sha; state.papers = parseCSV(b64dec(j.content));
+}
+// Apply a change to the latest version of papers.csv and commit it; retry once if someone else saved first.
+async function commit(change, message) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await pull();
+      change(state.papers);
+      const j = await gh('papers.csv', { method: 'PUT', body: JSON.stringify({ message, content: b64enc(toCSV(state.papers)), sha: state.sha, branch: 'main' }) });
+      state.sha = j.content.sha;
+      showBanner('Saved to GitHub. The public site updates within a minute or two.');
+      return true;
+    } catch (e) {
+      if (e.status === 409 && attempt === 0) continue;
+      if (e.message === 'dup') { showBanner('That paper is already in the log.', true); return false; }
+      showBanner(e.status === 401 || e.status === 403 || e.status === 404
+        ? 'GitHub refused the save. Check that the token has Contents: Read and write access to ' + REPO + '.'
+        : 'Could not save to GitHub. Check your connection and try again.', true);
+      return false;
+    } finally { render(); }
+  }
+}
+function showBanner(msg, err) { const b = $('banner'); b.textContent = msg; b.className = 'banner' + (err ? ' err' : ''); b.hidden = false; }
 
+// ---------------------------------------------------------------- render
 function render() {
-  const n = state.papers.length;
+  const n = state.papers.length, editing = !!state.token;
   const counts = Object.fromEntries(STATUSES.map(s => [s.id, state.papers.filter(p => stOf(p.status).id === s.id).length]));
   const done = counts['Read'] + counts['Key paper'];
   const bar = n ? STATUSES.map(s => `<span style="width:${100 * counts[s.id] / n}%;background:${s.color}" title="${s.id}: ${counts[s.id]}"></span>`).join('') : '';
@@ -148,59 +261,158 @@ function render() {
     STATUSES.map(s => `<div class="stat"><div class="n">${counts[s.id]}</div><div class="l">${s.id}</div></div>`).join('');
   $('statusChips').innerHTML = [{ id: 'all', label: 'All' }, ...STATUSES].map(s =>
     `<button type="button" class="chip" data-status="${esc(s.id)}" aria-pressed="${state.status === s.id}">${esc(s.label || s.id)}</button>`).join('');
+  const used = [...new Set(state.papers.flatMap(arms))], order = Object.keys(ARM_LABELS);
+  used.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  $('armFilter').innerHTML = `<option value="all">All arms</option>` + used.map(a => `<option value="${esc(a)}"${state.arm === a ? ' selected' : ''}>${esc(a)}</option>`).join('');
+  const years = [...new Set(state.papers.map(p => (p.added || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  $('yearFilter').innerHTML = `<option value="all">Added: any year</option>` + years.map(y => `<option value="${y}"${state.yearAdded === y ? ' selected' : ''}>Added in ${y}</option>`).join('');
+  $('arms-key').textContent = 'Arms: ' + used.map(a => `${a} ${ARM_LABELS[a] || ''}`.trim()).join(' · ');
+  const latest = state.papers.map(p => p.added).filter(Boolean).sort().pop();
+  $('updated').textContent = latest ? `${n} papers · last added ${latest.slice(0, 10)}` : '';
+  $('addBtn').hidden = !editing; $('editBtn').textContent = editing ? 'Stop editing' : 'Edit';
+
   const q = state.q.trim().toLowerCase();
   const ps = state.papers.filter(p =>
     (state.status === 'all' || stOf(p.status).id === state.status) &&
     (state.arm === 'all' || arms(p).includes(state.arm)) &&
     (state.yearAdded === 'all' || (p.added || '').startsWith(state.yearAdded)) &&
     (!q || [p.title, p.authors, p.venue, p.why, p.notes].join(' ').toLowerCase().includes(q)));
-  const by = {
+  ps.sort({
     priority: (a, b) => (PRI[a.priority] || 2) - (PRI[b.priority] || 2) || (+b.year || 0) - (+a.year || 0),
     year: (a, b) => (+b.year || 0) - (+a.year || 0),
     added: (a, b) => String(b.added).localeCompare(String(a.added)),
     title: (a, b) => String(a.title).localeCompare(String(b.title)),
-  }[state.sort];
-  ps.sort(by);
-  $('list').innerHTML = !n ? `<div class="empty">No papers yet. Add rows to papers.csv.</div>`
+  }[state.sort]);
+  $('list').innerHTML = !n ? `<div class="empty">No papers yet.${editing ? ' Use Add paper to start.' : ''}</div>`
     : !ps.length ? `<div class="empty">No papers match these filters.</div>`
     : ps.map(p => {
-      const s = stOf(p.status);
+      const s = stOf(p.status), id = esc(p.id);
       const meta = [p.authors, p.year, p.venue].filter(Boolean).map(esc).join(' · ');
-      return `<details class="paper">
+      const edit = !editing ? '' : `<div class="edit">
+          <div class="edit-row">
+            <label><span class="lbl">Status</span><select id="s-${id}" data-f="status">${STATUSES.map(x => `<option${x.id === s.id ? ' selected' : ''}>${x.id}</option>`).join('')}</select></label>
+            <label><span class="lbl">Priority</span><select id="p-${id}" data-f="priority">${['High', 'Medium', 'Low'].map(v => `<option${v === (p.priority || 'Medium') ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+            <label><span class="lbl">Arms</span><input id="a-${id}" data-f="arms" value="${esc(p.arms)}" size="14"></label>
+          </div>
+          <label><span class="lbl">Why it matters</span><textarea id="w-${id}" data-f="why">${esc(p.why)}</textarea></label>
+          <label><span class="lbl">My notes</span><textarea id="n-${id}" data-f="notes">${esc(p.notes)}</textarea></label>
+          <div class="edit-row">
+            <button class="btn primary" type="button" data-act="save">Save changes</button>
+            ${state.confirm === p.id
+              ? `<span>Remove this paper? <button class="btn danger" type="button" data-act="del-yes">Remove</button> <button class="btn" type="button" data-act="del-no">Keep</button></span>`
+              : `<button class="btn danger" type="button" data-act="del">Remove paper</button>`}
+          </div>
+        </div>`;
+      return `<details class="paper" data-id="${id}"${state.open.has(p.id) ? ' open' : ''}>
         <summary>
           <div><span class="status ${s.cls}">${esc(s.id)}</span><span class="pri">${esc(p.priority || 'Medium')} priority</span></div>
           <div><div class="title">${esc(p.title)}</div><div class="meta">${meta}</div></div>
           <div class="arms">${arms(p).map(a => `<span class="arm" title="${esc(ARM_LABELS[a] || a)}">${esc(a)}</span>`).join('')}</div>
         </summary>
         <div class="body">
-          ${p.why ? `<div><div class="lbl">Why it matters</div><p>${esc(p.why)}</p></div>` : ''}
-          ${p.notes ? `<div><div class="lbl">Notes</div><p>${esc(p.notes)}</p></div>` : ''}
-          ${p.link ? `<div><div class="lbl">Link</div><a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.link)}</a></div>` : ''}
+          ${!editing && p.why ? `<div><span class="lbl">Why it matters</span><p>${esc(p.why)}</p></div>` : ''}
+          ${!editing && p.notes ? `<div><span class="lbl">Notes</span><p>${esc(p.notes)}</p></div>` : ''}
+          ${p.link ? `<div><span class="lbl">Link</span><a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.link)}</a></div>` : ''}
           ${p.added ? `<div class="meta">Added ${esc(p.added.slice(0, 10))}</div>` : ''}
+          ${edit}
         </div>
       </details>`;
     }).join('');
 }
 
+// ---------------------------------------------------------------- events
 $('statusChips').addEventListener('click', e => { const b = e.target.closest('[data-status]'); if (b) { state.status = b.dataset.status; render(); } });
 $('armFilter').addEventListener('change', e => { state.arm = e.target.value; render(); });
 $('yearFilter').addEventListener('change', e => { state.yearAdded = e.target.value; render(); });
 $('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
 $('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+$('list').addEventListener('toggle', e => { const d = e.target.closest?.('details.paper'); if (d) d.open ? state.open.add(d.dataset.id) : state.open.delete(d.dataset.id); }, true);
+$('list').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const d = b.closest('details.paper'), id = d.dataset.id;
+  if (b.dataset.act === 'del') { state.confirm = id; render(); }
+  if (b.dataset.act === 'del-no') { state.confirm = null; render(); }
+  if (b.dataset.act === 'del-yes') { state.confirm = null; await commit(ps => ps.splice(ps.findIndex(p => p.id === id), 1), `Reading log: remove ${id}`); }
+  if (b.dataset.act === 'save') {
+    const patch = {}; d.querySelectorAll('[data-f]').forEach(el => patch[el.dataset.f] = el.value.trim());
+    b.disabled = true; b.textContent = 'Saving…';
+    await commit(ps => { const p = ps.find(x => x.id === id); if (p) Object.assign(p, patch); }, `Reading log: update ${id}`);
+  }
+});
 
-fetch('papers.csv', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => {
-  state.papers = parseCSV(t);
-  const used = [...new Set(state.papers.flatMap(arms))];
-  const order = Object.keys(ARM_LABELS);
-  used.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-  $('armFilter').innerHTML = `<option value="all">All arms</option>` + used.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
-  const years = [...new Set(state.papers.map(p => (p.added || '').slice(0, 4)).filter(Boolean))].sort().reverse();
-  $('yearFilter').innerHTML = `<option value="all">Added: any year</option>` + years.map(y => `<option value="${y}">Added in ${y}</option>`).join('');
-  $('arms-key').textContent = 'Arms: ' + used.map(a => `${a} ${ARM_LABELS[a] || ''}`.trim()).join(' · ');
-  const latest = state.papers.map(p => p.added).filter(Boolean).sort().pop();
-  if (latest) $('updated').textContent = `${state.papers.length} papers · last added ${latest.slice(0, 10)}`;
-  render();
-}).catch(() => { $('list').innerHTML = `<div class="empty">Could not load papers.csv. If you opened this file directly, run a local server instead (see the README).</div>`; });
+$('repoName').textContent = REPO;
+$('editBtn').addEventListener('click', () => {
+  if (state.token) { state.token = null; store.set('prl-token', null); $('banner').hidden = true; render(); return; }
+  $('tokErr').hidden = true; $('tokDlg').showModal(); $('tokInput').focus();
+});
+$('tokCancel').addEventListener('click', () => $('tokDlg').close());
+$('tokForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  state.token = $('tokInput').value.trim();
+  try { await pull(); store.set('prl-token', state.token); $('tokForm').reset(); $('tokDlg').close(); showBanner('Editing. Changes save straight to ' + REPO + '.'); render(); }
+  catch (err) { state.token = null; $('tokErr').textContent = err.status ? 'GitHub did not accept this token for ' + REPO + ' (error ' + err.status + ').' : 'Could not reach GitHub.'; $('tokErr').hidden = false; }
+});
+
+$('f-status').innerHTML = STATUSES.map(s => `<option>${s.id}</option>`).join('');
+$('addBtn').addEventListener('click', () => { $('f-err').hidden = true; $('addDlg').showModal(); $('f-ident').focus(); });
+$('f-cancel').addEventListener('click', () => $('addDlg').close());
+const surnames = list => { const n = list.filter(Boolean); return n.length <= 4 ? n.slice(0, -1).join(', ') + (n.length > 1 ? ' & ' : '') + (n.at(-1) || '') : n[0] + ' et al.'; };
+$('f-lookup').addEventListener('click', async () => {
+  let id = $('f-ident').value.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//, '');
+  const ax = id.match(/arxiv\.org\/(?:abs|pdf)\/([^\s?#]+?)(?:v\d+)?(?:\.pdf)?$/) || id.match(/^(\d{4}\.\d{4,5})(?:v\d+)?$/);
+  const btn = $('f-lookup'); btn.disabled = true; btn.textContent = 'Looking up…'; $('f-err').hidden = true;
+  try {
+    if (ax) {
+      const j = await (await fetch('https://api.datacite.org/dois/10.48550/arXiv.' + ax[1])).json();
+      const a = j.data.attributes;
+      $('f-title').value = a.titles[0].title.replace(/\s+/g, ' ');
+      $('f-authors').value = surnames(a.creators.map(c => c.familyName || (c.name || '').split(',')[0]));
+      $('f-year').value = a.publicationYear || ''; $('f-venue').value = 'arXiv ' + ax[1]; $('f-link').value = 'https://arxiv.org/abs/' + ax[1];
+    } else if (id.startsWith('10.')) {
+      const m = (await (await fetch('https://api.crossref.org/works/' + encodeURIComponent(id))).json()).message;
+      $('f-title').value = (m.title || [''])[0].replace(/\s+/g, ' ');
+      $('f-authors').value = surnames((m.author || []).map(a => a.family || a.name));
+      const dp = ['published-print', 'published-online', 'issued', 'posted'].map(k => m[k]?.['date-parts']?.[0]?.[0]).find(Boolean);
+      $('f-year').value = dp || ''; $('f-venue').value = (m['container-title'] || [''])[0] || m.publisher || ''; $('f-link').value = 'https://doi.org/' + id;
+    } else throw new Error('format');
+  } catch (err) {
+    $('f-err').textContent = err.message === 'format' ? 'Enter a DOI (starting 10.) or an arXiv ID such as 2207.03523.' : 'Could not find that paper. Fill in the fields by hand.';
+    $('f-err').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'Look up'; }
+});
+$('addForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const p = { title: $('f-title').value.trim(), authors: $('f-authors').value.trim(), year: $('f-year').value.trim(), venue: $('f-venue').value.trim(),
+    link: $('f-link').value.trim(), arms: $('f-arms').value.split(/[;,]/).map(s => s.trim()).filter(Boolean).join('; '),
+    status: $('f-status').value, priority: $('f-priority').value, why: $('f-why').value.trim(), notes: '', added: new Date().toISOString().slice(0, 19) + 'Z' };
+  if (!p.title) return;
+  const first = ((p.authors.split(/[,&]/)[0] || 'paper').trim().split(/\s+/)[0] || 'paper').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '') || 'paper';
+  $('f-save').disabled = true;
+  const ok = await commit(ps => {
+    if (ps.some(x => x.title.toLowerCase() === p.title.toLowerCase())) throw Object.assign(new Error('dup'), { status: 0 });
+    let id = `${first}-${p.year || 'nd'}`, i = 2; while (ps.some(x => x.id === id)) id = `${first}-${p.year || 'nd'}-${i++}`;
+    ps.push({ id, ...p });
+  }, `Reading log: add ${p.title.slice(0, 60)}`);
+  $('f-save').disabled = false;
+  if (ok) { $('addForm').reset(); $('addDlg').close(); }
+  else if (state.papers.some(x => x.title.toLowerCase() === p.title.toLowerCase())) { $('f-err').textContent = 'That paper is already in the log.'; $('f-err').hidden = false; }
+});
+
+// ---------------------------------------------------------------- load
+(async () => {
+  const saved = store.get('prl-token');
+  if (saved) {
+    state.token = saved;
+    try { await pull(); render(); showBanner('Editing. Changes save straight to ' + REPO + '.'); return; }
+    catch { state.token = null; store.set('prl-token', null); }
+  }
+  try {
+    const r = await fetch('papers.csv', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    state.papers = parseCSV(await r.text());
+    render();
+  } catch { $('list').innerHTML = `<div class="empty">Could not load papers.csv. If you opened this file directly, run a local server instead (see the README).</div>`; }
+})();
 </script>
 </body>
 </html>
