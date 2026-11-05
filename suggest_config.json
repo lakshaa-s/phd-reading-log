@@ -1,0 +1,33 @@
+{
+  "_help": "Settings for the weekly paper finder (scripts/suggest.py). Edit the term lists to steer it. A term matches anywhere in a word, so 'dendrit' matches dendrite, dendrites and dendritic. A paper is only suggested if its title or abstract contains at least one 'require_any' term. Each arm's terms then decide which arms it is filed under. Title matches count 3, abstract matches 1.",
+  "days_back": 7,
+  "max_suggestions": 20,
+  "max_per_arm": 6,
+  "min_score": 4,
+  "high_priority_score": 10,
+  "require_any": [
+    "dendrit", "morpholog", "compartment", "cable theory", "single neuron", "single-neuron",
+    "neuroevolution", "evolutionary algorithm", "genetic algorithm", "evolution strateg", "quality diversity", "map-elites", "hyperneat",
+    "multisensory", "multimodal integration", "cue integration", "cross-modal", "crossmodal",
+    "granule cell", "shunting inhibition", "plateau potential", "nmda spike",
+    "excitation-inhibition", "excitatory-inhibitory", "e/i balance", "neuronal diversity", "neuronal heterogeneity",
+    "mod-cog", "neurogym", "cognitive tasks"
+  ],
+  "exclude_any": ["clinical trial", "retrospective cohort", "case report"],
+  "arms": {
+    "A1": {"label": "build with motifs (evolution)", "terms": ["neuroevolution", "evolutionary algorithm", "genetic algorithm", "evolution strateg", "evolved", "quality diversity", "map-elites", "hyperneat", "indirect encoding", "modular", "motif", "architecture search"]},
+    "A2": {"label": "build with morphological neurons (gradients)", "terms": ["dendrit", "morpholog", "compartment", "cable theory", "active dendrite", "nmda spike", "plateau potential", "single neuron computation", "single-neuron", "biophysical", "pyramidal", "granule cell", "purkinje", "differentiable"]},
+    "B1": {"label": "E:I balance", "terms": ["excitation-inhibition", "excitatory-inhibitory", "excitatory and inhibitory", "e/i balance", "e-i balance", "shunting inhibition", "tonic inhibition", "interneuron", "gaba", "golgi cell", "dale's law"]},
+    "B2": {"label": "multisensory integration", "terms": ["multisensory", "multimodal integration", "multimodal", "cue integration", "cue combination", "cross-modal", "crossmodal", "audiovisual", "visuo-", "mossy fib", "cognitive tasks", "mod-cog", "neurogym", "task-trained"]},
+    "C1": {"label": "perturbing morphology", "terms": ["pruning", "dendrite loss", "dendritic loss", "spine loss", "synapse loss", "synaptic loss", "lesion", "ablation", "perturb", "damage", "robustness"]},
+    "C2": {"label": "disease-model sets", "terms": ["alzheimer", "autism", "schizophren", "epilep", "parkinson", "neurodegenerat", "down syndrome", "fragile x", "disease model", "mouse model"]},
+    "Methods": {"label": "methods", "terms": ["simulator", "neuron simulator", "arbor", "brian2", "jaxley", "surrogate gradient", "spiking neural network", "backpropagation", "neuromorpho", "reconstruction", "toolbox", "interpretab"]},
+    "Background": {"label": "background", "terms": ["neuroai", "inductive bias", "biologically plausible", "biological plausibility", "heterogeneity", "diversity", "cell type"]}
+  },
+  "sources": {
+    "arxiv_query": "cat:q-bio.NC OR cat:cs.NE OR (cat:cs.LG AND (abs:dendritic OR abs:neuroevolution OR abs:multisensory OR abs:morphology))",
+    "arxiv_max_results": 400,
+    "biorxiv_categories": ["neuroscience"],
+    "openalex_searches": ["dendritic computation", "neuronal morphology", "dendrites neural network", "neuroevolution", "multisensory integration neural network", "cerebellar granule cell", "shunting inhibition", "compartmental neuron model"]
+  }
+}

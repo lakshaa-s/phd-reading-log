@@ -28,6 +28,14 @@ You can also edit `papers.csv` directly in Excel, Numbers or the GitHub web edit
 | priority | High · Medium · Low |
 | arms | A1 build with motifs (evolution) · A2 build with morphological neurons (gradients) · B1 E:I balance · B2 multisensory integration · C1 perturbing morphology · C2 disease-model sets · Methods · Background (separate several with `;`) |
 
+## Weekly paper suggestions
+
+Every Monday morning a GitHub Action (`.github/workflows/suggest.yml`) runs `scripts/suggest.py`. It searches the past week of arXiv (q-bio.NC, cs.NE and matching cs.LG), bioRxiv neuroscience and journals (through OpenAlex), and keeps papers that match the PhD topics. It files each one under plan arms and writes them to `suggestions.csv`. They appear on the site under **Suggested this week**. In edit mode, **Add to log** copies a paper into `papers.csv` as To read, and **Dismiss** hides it. Nothing already in the log, and nothing dismissed, is suggested again.
+
+- Run it now: GitHub → Actions → Weekly paper suggestions → Run workflow (you can choose how many days back to search).
+- Steer it: edit `suggest_config.json`. `require_any` decides what counts as relevant, each arm's `terms` decide where a paper is filed, and `max_suggestions`, `max_per_arm` and `min_score` control how many you get.
+- Try it locally: `python scripts/suggest.py --dry-run` prints what it would suggest without changing anything.
+
 ## Viewing the site locally
 
 ```

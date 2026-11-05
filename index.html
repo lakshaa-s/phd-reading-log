@@ -100,6 +100,24 @@ form .full { grid-column: 1 / -1; }
 .hint { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin: 0; }
 .actions { grid-column: 1 / -1; display: flex; justify-content: end; gap: 8px; margin-top: 6px; }
 .err { grid-column: 1 / -1; color: var(--danger); font-size: 13px; margin: 0; }
+details.sugg { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+details.sugg > summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; padding: 12px 14px; }
+details.sugg > summary h2 { margin: 0; font: 600 18px var(--display); }
+details.sugg > summary h2::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--muted); transition: transform .15s; }
+details.sugg[open] > summary h2::before { transform: rotate(90deg); }
+.sg-meta { color: var(--muted); font-size: 13px; }
+.sg-groups { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 14px; }
+.sg-group h3 { margin: 0 0 6px; font: 500 12px var(--mono); letter-spacing: .05em; color: var(--muted); text-transform: uppercase; }
+.sg-item { border-top: 1px solid var(--line); padding: 10px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
+.sg-item .title a { color: inherit; text-decoration: none; }
+.sg-item .title a:hover { color: var(--accent); text-decoration: underline; }
+.sg-abs { grid-column: 1 / -1; color: var(--muted); font-size: 13px; margin: 0; max-width: 90ch; }
+.sg-why { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.sg-why b { font-weight: 500; color: var(--fg); }
+.sg-acts { grid-column: 1 / -1; display: flex; gap: 8px; }
+.sg-item .arms { align-items: start; align-self: start; }
+.sg-empty { padding: 0 14px 14px; color: var(--muted); font-size: 14px; margin: 0; }
+.sg-more { margin: 0 14px 14px; }
 @media (max-width: 720px) {
   .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary .stat:first-child { grid-column: 1 / -1; }
@@ -107,6 +125,8 @@ form .full { grid-column: 1 / -1; }
   .arms { justify-content: start; }
   .body { padding: 4px 14px 16px; }
   form.add, form.tok { grid-template-columns: 1fr; }
+  .sg-item { grid-template-columns: minmax(0, 1fr); }
+  .sg-item .arms { justify-content: start; }
 }
 </style>
 </head>
@@ -124,6 +144,7 @@ form .full { grid-column: 1 / -1; }
   </header>
   <div class="banner" id="banner" hidden></div>
   <section class="summary" id="summary" aria-label="Reading progress"></section>
+  <details class="sugg" id="sugg" open><summary><h2>Suggested this week</h2><span class="sg-meta" id="sgMeta"></span></summary><div id="sgBody"></div></details>
   <div class="filters">
     <input type="search" id="q" placeholder="Search title, authors, notes" aria-label="Search papers">
     <div class="chips" id="statusChips" role="group" aria-label="Filter by status"></div>
@@ -147,7 +168,7 @@ form .full { grid-column: 1 / -1; }
   <form class="tok" id="tokForm">
     <h2>Edit the reading log</h2>
     <p class="hint">Changes are saved to <span id="repoName"></span> on GitHub. Paste a fine-grained personal access token for that repository with <b>Contents: Read and write</b> permission. It is kept only in this browser. <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a></p>
-    <label class="full">Token<input id="tokInput" type="password" autocomplete="off" required></label>
+    <label class="full">Token<input id="tokInput" type="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" required></label>
     <p class="err" id="tokErr" hidden></p>
     <div class="actions"><button class="btn" type="button" id="tokCancel">Cancel</button><button class="btn primary" type="submit">Start editing</button></div>
   </form>
@@ -183,13 +204,15 @@ const STATUSES = [
 ];
 const ARM_LABELS = { A1: 'build with motifs (evolution)', A2: 'build with morphological neurons (gradients)', B1: 'E:I balance', B2: 'multisensory integration', C1: 'perturbing morphology', C2: 'disease-model sets', Methods: 'methods', Background: 'background' };
 const PRI = { High: 1, Medium: 2, Low: 3 };
+const SFIELDS = ['sid', 'week', 'title', 'authors', 'year', 'venue', 'link', 'arms', 'score', 'matched', 'summary', 'status'];
+const HIGH_SCORE = 10;   // suggestions scoring this or more are added as High priority (as in suggest_config.json)
 // Repository that holds papers.csv: worked out from the GitHub Pages address, or set it here.
 const REPO = (() => {
   const h = location.hostname.match(/^([^.]+)\.github\.io$/);
   const seg = location.pathname.split('/').filter(Boolean)[0];
   return h && seg ? `${h[1]}/${seg}` : 'lakshaa-s/phd-reading-log';
 })();
-const state = { papers: [], status: 'all', arm: 'all', yearAdded: 'all', q: '', sort: 'priority', open: new Set(), confirm: null, token: null, sha: null };
+const state = { papers: [], status: 'all', arm: 'all', yearAdded: 'all', q: '', sort: 'priority', open: new Set(), confirm: null, token: null, sha: null, sugg: [], showOld: false, shas: {} };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const stOf = s => STATUSES.find(x => x.id === s) || STATUSES[0];
@@ -214,7 +237,7 @@ function parseCSV(text) {
   return rest.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? '').trim()])));
 }
 const csvField = v => { v = String(v ?? ''); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-const toCSV = rows => [FIELDS.join(','), ...rows.map(r => FIELDS.map(f => csvField(r[f])).join(','))].join('\n') + '\n';
+const toCSV = (rows, fields = FIELDS) => [fields.join(','), ...rows.map(r => fields.map(f => csvField(r[f])).join(','))].join('\n') + '\n';
 
 // ---------------------------------------------------------------- GitHub
 const b64enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (const x of b) bin += String.fromCharCode(x); return btoa(bin); };
@@ -225,19 +248,23 @@ async function gh(path, opts = {}) {
   if (!r.ok) { const e = new Error(`GitHub ${r.status}`); e.status = r.status; throw e; }
   return r.json();
 }
-async function pull() {
-  const j = await gh('papers.csv?ref=main');
-  state.sha = j.sha; state.papers = parseCSV(b64dec(j.content));
+const FILES = { 'papers.csv': { fields: FIELDS, key: 'papers' }, 'suggestions.csv': { fields: SFIELDS, key: 'sugg' } };
+async function pullFile(path) {
+  try { const j = await gh(path + '?ref=main'); state.shas[path] = j.sha; state[FILES[path].key] = parseCSV(b64dec(j.content)); }
+  catch (e) { if (e.status === 404 && path !== 'papers.csv') { state.shas[path] = undefined; state[FILES[path].key] = []; } else throw e; }
 }
-// Apply a change to the latest version of papers.csv and commit it; retry once if someone else saved first.
-async function commit(change, message) {
+async function pull() { await pullFile('papers.csv'); await pullFile('suggestions.csv'); }
+// Apply a change to the latest version of a CSV file and commit it; retry once if someone else saved first.
+// `change` may return false to mean "nothing to save".
+async function commitFile(path, change, message, quiet) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      await pull();
-      change(state.papers);
-      const j = await gh('papers.csv', { method: 'PUT', body: JSON.stringify({ message, content: b64enc(toCSV(state.papers)), sha: state.sha, branch: 'main' }) });
-      state.sha = j.content.sha;
-      showBanner('Saved to GitHub. The public site updates within a minute or two.');
+      await pullFile(path);
+      if (change(state[FILES[path].key]) === false) return true;
+      const body = { message, content: b64enc(toCSV(state[FILES[path].key], FILES[path].fields)), branch: 'main', ...(state.shas[path] ? { sha: state.shas[path] } : {}) };
+      const j = await gh(path, { method: 'PUT', body: JSON.stringify(body) });
+      state.shas[path] = j.content.sha;
+      if (!quiet) showBanner('Saved to GitHub. The public site updates within a minute or two.');
       return true;
     } catch (e) {
       if (e.status === 409 && attempt === 0) continue;
@@ -249,6 +276,12 @@ async function commit(change, message) {
     } finally { render(); }
   }
 }
+const commit = (change, message) => commitFile('papers.csv', change, message);
+const makeId = (ps, authors, year) => {
+  const first = ((String(authors).split(/[,&]/)[0] || 'paper').trim().split(/\s+/)[0] || 'paper').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '') || 'paper';
+  let id = `${first}-${year || 'nd'}`, i = 2; while (ps.some(x => x.id === id)) id = `${first}-${year || 'nd'}-${i++}`;
+  return id;
+};
 function showBanner(msg, err) { const b = $('banner'); b.textContent = msg; b.className = 'banner' + (err ? ' err' : ''); b.hidden = false; }
 
 // ---------------------------------------------------------------- render
@@ -269,6 +302,7 @@ function render() {
   $('arms-key').textContent = 'Arms: ' + used.map(a => `${a} ${ARM_LABELS[a] || ''}`.trim()).join(' · ');
   const latest = state.papers.map(p => p.added).filter(Boolean).sort().pop();
   $('updated').textContent = latest ? `${n} papers · last added ${latest.slice(0, 10)}` : '';
+  renderSugg(editing);
   $('addBtn').hidden = !editing; $('editBtn').textContent = editing ? 'Stop editing' : 'Edit';
 
   const q = state.q.trim().toLowerCase();
@@ -319,6 +353,61 @@ function render() {
       </details>`;
     }).join('');
 }
+
+// ---------------------------------------------------------------- suggestions
+const niceDate = d => { const t = new Date(d + 'T12:00:00Z'); return isNaN(t) ? d : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+function renderSugg(editing) {
+  const fresh = state.sugg.filter(s => (s.status || 'new') === 'new');
+  const latest = fresh.map(s => s.week).sort().pop();
+  const now = fresh.filter(s => s.week === latest), older = fresh.filter(s => s.week !== latest);
+  const lastRun = state.sugg.map(s => s.week).sort().pop();
+  $('sgMeta').textContent = fresh.length
+    ? `${now.length} found in the week of ${niceDate(latest)} · filed by arm · new search every Monday`
+    : lastRun ? `All caught up · last search week of ${niceDate(lastRun)}` : 'Searches arXiv, bioRxiv and journals every Monday';
+  if (!fresh.length) {
+    $('sgBody').innerHTML = `<p class="sg-empty">${lastRun ? 'Nothing waiting. New suggestions arrive on Monday.' : 'No suggestions yet. The first search runs on Monday, or start one now from the Actions tab on GitHub (Weekly paper suggestions → Run workflow).'}</p>`;
+    return;
+  }
+  const show = state.showOld ? fresh : now, order = Object.keys(ARM_LABELS);
+  const groups = {};
+  show.forEach(s => { const a = arms(s)[0] || 'Background'; (groups[a] = groups[a] || []).push(s); });
+  const keys = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  $('sgBody').innerHTML = `<div class="sg-groups">${keys.map(a => `<div class="sg-group"><h3>${esc(a)} · ${esc(ARM_LABELS[a] || '')}</h3>${groups[a]
+    .sort((x, y) => (+y.score || 0) - (+x.score || 0)).map(s => `<div class="sg-item" data-sid="${esc(s.sid)}">
+      <div><div class="title">${s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : esc(s.title)}</div>
+        <div class="meta">${[s.authors, s.venue, s.week !== latest ? 'week of ' + niceDate(s.week) : ''].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <div class="arms">${arms(s).map(x => `<span class="arm" title="${esc(ARM_LABELS[x] || x)}">${esc(x)}</span>`).join('')}</div>
+      ${s.summary ? `<p class="sg-abs">${esc(s.summary)}</p>` : ''}
+      <div class="sg-why">Match score ${esc(s.score)}${s.matched ? ` · matched: <b>${esc(s.matched)}</b>` : ''}</div>
+      ${editing ? `<div class="sg-acts"><button class="btn primary" type="button" data-sg="add">Add to log</button><button class="btn" type="button" data-sg="dismiss">Dismiss</button></div>` : ''}
+    </div>`).join('')}</div>`).join('')}</div>` +
+    (older.length ? `<button class="btn sg-more" type="button" data-sg="older">${state.showOld ? 'Show this week only' : `Show ${older.length} more from earlier weeks`}</button>` : '') +
+    (!editing ? `<p class="sg-empty">Click Edit to add suggestions to the log or dismiss them.</p>` : '');
+}
+async function actOnSuggestion(sid, act, btn) {
+  const s = state.sugg.find(x => x.sid === sid); if (!s) return;
+  btn.disabled = true; btn.textContent = act === 'add' ? 'Adding…' : 'Dismissing…';
+  if (act === 'add') {
+    const ok = await commitFile('papers.csv', ps => {
+      if (ps.some(x => x.title.toLowerCase() === s.title.toLowerCase())) return false;     // already in the log
+      ps.push({ id: makeId(ps, s.authors, s.year), title: s.title, authors: s.authors, year: s.year, venue: s.venue, link: s.link, arms: s.arms,
+        status: 'To read', priority: (+s.score || 0) >= HIGH_SCORE ? 'High' : 'Medium', why: `Suggested in the week of ${s.week}. Matched: ${s.matched}.`,
+        notes: '', added: new Date().toISOString().slice(0, 19) + 'Z' });
+    }, `Reading log: add ${s.title.slice(0, 60)} (suggested)`, true);
+    if (!ok) return;
+  }
+  const status = act === 'add' ? 'added' : 'dismissed';
+  if (await commitFile('suggestions.csv', ss => { const x = ss.find(r => r.sid === sid); if (!x) return false; x.status = status; },
+      `Reading log: suggestion ${sid} ${status}`, true))
+    showBanner(act === 'add' ? 'Added to the log as To read.' : 'Dismissed. It will not be suggested again.');
+}
+$('sgBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-sg]'); if (!b) return;
+  if (b.dataset.sg === 'older') { state.showOld = !state.showOld; render(); return; }
+  actOnSuggestion(b.closest('.sg-item').dataset.sid, b.dataset.sg, b);
+});
+$('sugg').open = store.get('prl-sugg-open') !== '0';
+$('sugg').addEventListener('toggle', () => store.set('prl-sugg-open', $('sugg').open ? '1' : '0'));
 
 // ---------------------------------------------------------------- events
 $('statusChips').addEventListener('click', e => { const b = e.target.closest('[data-status]'); if (b) { state.status = b.dataset.status; render(); } });
@@ -386,12 +475,10 @@ $('addForm').addEventListener('submit', async e => {
     link: $('f-link').value.trim(), arms: $('f-arms').value.split(/[;,]/).map(s => s.trim()).filter(Boolean).join('; '),
     status: $('f-status').value, priority: $('f-priority').value, why: $('f-why').value.trim(), notes: '', added: new Date().toISOString().slice(0, 19) + 'Z' };
   if (!p.title) return;
-  const first = ((p.authors.split(/[,&]/)[0] || 'paper').trim().split(/\s+/)[0] || 'paper').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '') || 'paper';
   $('f-save').disabled = true;
   const ok = await commit(ps => {
     if (ps.some(x => x.title.toLowerCase() === p.title.toLowerCase())) throw Object.assign(new Error('dup'), { status: 0 });
-    let id = `${first}-${p.year || 'nd'}`, i = 2; while (ps.some(x => x.id === id)) id = `${first}-${p.year || 'nd'}-${i++}`;
-    ps.push({ id, ...p });
+    ps.push({ id: makeId(ps, p.authors, p.year), ...p });
   }, `Reading log: add ${p.title.slice(0, 60)}`);
   $('f-save').disabled = false;
   if (ok) { $('addForm').reset(); $('addDlg').close(); }
@@ -410,6 +497,7 @@ $('addForm').addEventListener('submit', async e => {
     const r = await fetch('papers.csv', { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
     state.papers = parseCSV(await r.text());
+    try { const s = await fetch('suggestions.csv', { cache: 'no-store' }); if (s.ok) state.sugg = parseCSV(await s.text()); } catch {}
     render();
   } catch { $('list').innerHTML = `<div class="empty">Could not load papers.csv. If you opened this file directly, run a local server instead (see the README).</div>`; }
 })();
