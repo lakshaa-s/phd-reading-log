@@ -1,4 +1,4 @@
-"""Aby, the weekly paper finder: search recent papers, file them under plan arms, write suggestions.csv.
+"""Abu, the weekly paper finder: search recent papers, file them under plan arms, write suggestions.csv.
 
 Runs every Monday from .github/workflows/suggest.yml, or by hand:
     python scripts/suggest.py                # search the last `days_back` days (suggest_config.json)

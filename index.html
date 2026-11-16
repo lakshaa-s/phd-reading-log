@@ -231,7 +231,7 @@ details.paper.flash { animation: flash 1.4s ease; }
     <div class="brand"><i></i>Reading Log</div>
     <div class="links">
       <button type="button" data-go="papers">My papers</button>
-      <button type="button" data-go="sugg">Aby’s picks</button>
+      <button type="button" data-go="sugg">Abu’s picks</button>
       <button type="button" data-go="progress">Progress</button>
     </div>
     <div class="navtools">
@@ -245,15 +245,15 @@ details.paper.flash { animation: flash 1.4s ease; }
     <h1><span class="grad">Lakshaa’s</span>Reading Log.</h1>
     <p class="sub">Every paper I’ve read and plan to read for my PhD, tagged by plan arm, with why it matters and my notes.</p>
     <div class="cta">
-      <button class="btn primary" type="button" id="askBtn">What should I read next?</button>
+      <button class="btn primary" type="button" id="askBtn">Ask Abu</button>
       <button class="btn outline" type="button" data-go="papers">Browse papers</button>
     </div>
     <div class="stage">
       <div class="glow" aria-hidden="true"></div>
       <span class="orb o1" aria-hidden="true"></span><span class="orb o2" aria-hidden="true"></span><span class="orb o3" aria-hidden="true"></span><span class="orb o4" aria-hidden="true"></span>
       <div class="aby-wrap">
-        <button class="aby" id="aby" type="button" aria-haspopup="dialog" aria-expanded="false" title="What should I read next?"><img src="portrait.jpg" alt="Lakshaa and her cat"></button>
-        <span class="aby-hint" aria-hidden="true">🐾 What next?</span>
+        <button class="aby" id="aby" type="button" aria-haspopup="dialog" aria-expanded="false" title="Ask Abu what to read next"><img src="portrait.jpg" alt="Lakshaa and her cat Abu"></button>
+        <span class="aby-hint" aria-hidden="true">🐾 Ask Abu</span>
         <div class="bubble" id="bubble" role="status" hidden></div>
       </div>
     </div>
@@ -262,10 +262,10 @@ details.paper.flash { animation: flash 1.4s ease; }
   <section class="summary" id="summary" aria-label="Reading progress"></section>
   <div class="tabs" role="tablist" id="tabs-anchor">
     <button class="tab" role="tab" id="tab-papers" aria-controls="panel-papers" aria-selected="true" type="button">My papers <span class="count" id="nPapers"></span></button>
-    <button class="tab" role="tab" id="tab-sugg" aria-controls="panel-sugg" aria-selected="false" type="button"><img class="aby-ico" src="aby-face.jpg" alt="">Aby’s picks <span class="count" id="nSugg"></span></button>
+    <button class="tab" role="tab" id="tab-sugg" aria-controls="panel-sugg" aria-selected="false" type="button"><img class="aby-ico" src="abu-face.jpg" alt="">Abu’s picks <span class="count" id="nSugg"></span></button>
   </div>
   <section class="panel" id="panel-sugg" role="tabpanel" aria-labelledby="tab-sugg" hidden>
-    <div class="sg-intro"><img src="aby-face.jpg" alt="Aby the cat"><div><div class="sg-name">Aby, paper finder</div><span class="sg-meta" id="sgMeta"></span></div></div>
+    <div class="sg-intro"><img src="abu-face.jpg" alt="Abu the cat"><div><div class="sg-name">Abu, paper finder</div><span class="sg-meta" id="sgMeta"></span></div></div>
     <div id="sgBody"></div>
   </section>
   <section class="panel" id="panel-papers" role="tabpanel" aria-labelledby="tab-papers">
@@ -494,7 +494,7 @@ function renderSugg(editing) {
     ? `Searched arXiv, bioRxiv and journals and brought back ${now.length} paper${now.length === 1 ? '' : 's'} for the week of ${niceDate(latest)}, sorted by plan arm. Hunts again every Monday.`
     : lastRun ? `All caught up. Last hunt: week of ${niceDate(lastRun)}. Out again on Monday.` : 'Hunts through arXiv, bioRxiv and journals every Monday.';
   if (!fresh.length) {
-    $('sgBody').innerHTML = `<p class="sg-empty">${lastRun ? 'Nothing waiting. Aby brings new papers on Monday.' : 'No picks yet. Aby’s first hunt is on Monday, or send her out now from the Actions tab on GitHub (Aby: weekly paper picks → Run workflow).'}</p>`;
+    $('sgBody').innerHTML = `<p class="sg-empty">${lastRun ? 'Nothing waiting. Abu brings new papers on Monday.' : 'No picks yet. Abu’s first hunt is on Monday, or send her out now from the Actions tab on GitHub (Abu: weekly paper picks → Run workflow).'}</p>`;
     return;
   }
   const show = state.showOld ? fresh : now, order = Object.keys(ARM_LABELS);
@@ -511,7 +511,7 @@ function renderSugg(editing) {
       ${editing ? `<div class="sg-acts"><button class="btn primary" type="button" data-sg="add">Add to log</button><button class="btn" type="button" data-sg="dismiss">Dismiss</button></div>` : ''}
     </div>`).join('')}</div></div>`).join('')}</div>` +
     (older.length ? `<button class="btn sg-more" type="button" data-sg="older">${state.showOld ? 'Show this week only' : `Show ${older.length} more from earlier weeks`}</button>` : '') +
-    (!editing ? `<p class="sg-empty">Click Edit to add Aby’s picks to your log or dismiss them.</p>` : '');
+    (!editing ? `<p class="sg-empty">Click Edit to add Abu’s picks to your log or dismiss them.</p>` : '');
 }
 async function actOnSuggestion(sid, act, btn) {
   const s = state.sugg.find(x => x.sid === sid); if (!s) return;
@@ -520,7 +520,7 @@ async function actOnSuggestion(sid, act, btn) {
     const ok = await commitFile('papers.csv', ps => {
       if (ps.some(x => x.title.toLowerCase() === s.title.toLowerCase())) return false;     // already in the log
       ps.push({ id: makeId(ps, s.authors, s.year), title: s.title, authors: s.authors, year: s.year, venue: s.venue, link: s.link, arms: s.arms,
-        status: 'To read', priority: (+s.score || 0) >= HIGH_SCORE ? 'High' : 'Medium', why: `Aby’s pick for the week of ${s.week}. Matched: ${s.matched}.`,
+        status: 'To read', priority: (+s.score || 0) >= HIGH_SCORE ? 'High' : 'Medium', why: `Abu’s pick for the week of ${s.week}. Matched: ${s.matched}.`,
         notes: '', added: new Date().toISOString().slice(0, 19) + 'Z' });
     }, `Reading log: add ${s.title.slice(0, 60)} (suggested)`, true);
     if (!ok) return;
@@ -528,7 +528,7 @@ async function actOnSuggestion(sid, act, btn) {
   const status = act === 'add' ? 'added' : 'dismissed';
   if (await commitFile('suggestions.csv', ss => { const x = ss.find(r => r.sid === sid); if (!x) return false; x.status = status; },
       `Reading log: suggestion ${sid} ${status}`, true))
-    showBanner(act === 'add' ? 'Added to the log as To read.' : 'Dismissed. Aby won’t bring it back.');
+    showBanner(act === 'add' ? 'Added to the log as To read.' : 'Dismissed. Abu won’t bring it back.');
 }
 $('sgBody').addEventListener('click', e => {
   const ab = e.target.closest('.sg-abs'); if (ab) { ab.classList.toggle('full'); return; }
@@ -576,7 +576,7 @@ function paws(n = 8) {
   }
 }
 function say(html) {
-  const b = $('bubble'); b.innerHTML = `<span class="who">Next up</span>${html}`; b.hidden = false; $('aby').setAttribute('aria-expanded', 'true');
+  const b = $('bubble'); b.innerHTML = `<span class="who">Abu says</span>${html}`; b.hidden = false; $('aby').setAttribute('aria-expanded', 'true');
 }
 function hush() { $('bubble').hidden = true; $('aby').setAttribute('aria-expanded', 'false'); }
 function abyPick() {
